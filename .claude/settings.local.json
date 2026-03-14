@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd \"D:/Personal/Projects/PlanetsTracker\" && npm install && npm install @react-three/fiber @react-three/drei three astronomy-engine && npm install -D tailwindcss @tailwindcss/vite 2>&1)",
+      "Bash(cd \"D:/Personal/Projects/PlanetsTracker\" && npm run build 2>&1)"
+    ]
+  }
+}
