@@ -161,6 +161,39 @@ export const MOON_DATA = {
   ],
 }
 
+export const HALLEY_DATA = {
+  name: "Halley's Comet",
+  body: 'Halley',
+  color: '#aaddff',
+  emoji: '☄️',
+  comet: true,
+  facts: [
+    "Returns to the inner solar system every ~75 years — last perihelion Feb 9, 1986",
+    "Next expected perihelion: ~Jul 28, 2061",
+    "Retrograde orbit — travels opposite to the planets at 162° inclination",
+    "Source of the Eta Aquariid and Orionid meteor showers each year",
+  ],
+}
+
+export const ISS_DATA = {
+  name: 'ISS',
+  body: 'ISS',
+  color: '#00ff88',
+  emoji: '🛸',
+  iss: true,
+  facts: [
+    'Orbiting at ~408 km altitude — one full orbit every ~92 minutes',
+    'Travels at ~27,600 km/h — 23× the speed of sound',
+    'Has been continuously inhabited since November 2, 2000',
+    'Visible to the naked eye at dusk or dawn — look for a fast-moving star',
+  ],
+}
+
+export const BELT_DATA = [
+  { name: 'Asteroid Belt', emoji: '🪨', type: 'belt', color: '#a89880', cameraY: 38  },
+  { name: 'Kuiper Belt',   emoji: '🧊', type: 'belt', color: '#6688aa', cameraY: 320 },
+]
+
 // Scale factors for display (not real scale — for readability)
 // Orbital radii in AU → mapped to scene units (1 AU = 6 scene units)
 export const AU_SCALE = 6

@@ -7,8 +7,9 @@ import Planet from './Planet'
 import MoonOrbit from './Moon'
 import AsteroidBelt from './AsteroidBelt'
 import KuiperBelt from './KuiperBelt'
-import { getPlanetPosition, getElongationEvent } from '../utils/astronomy'
+import { getPlanetPosition, getElongationEvent, getHalleyPosition } from '../utils/astronomy'
 import { PLANETS, AU_SCALE, SUN_DATA } from '../data/planets'
+import Comet from './Comet'
 
 function CameraAnimator({ scenePos }) {
   const { camera } = useThree()
@@ -38,7 +39,30 @@ function CameraAnimator({ scenePos }) {
   return null
 }
 
-export default function SolarSystem({ date, selectedPlanet, focusPlanet, onPlanetClick }) {
+function BeltCameraAnimator({ cameraY }) {
+  const { camera } = useThree()
+  const controls = useThree((s) => s.controls)
+  const target = useRef(new THREE.Vector3())
+  const animating = useRef(false)
+
+  useEffect(() => {
+    if (!cameraY) return
+    target.current.set(0, cameraY, 0)
+    animating.current = true
+  }, [cameraY])
+
+  useFrame(() => {
+    if (!animating.current || !controls) return
+    camera.position.lerp(target.current, 0.05)
+    controls.target.lerp(new THREE.Vector3(0, 0, 0), 0.05)
+    controls.update()
+    if (camera.position.distanceTo(target.current) < 0.5) animating.current = false
+  })
+
+  return null
+}
+
+export default function SolarSystem({ date, selectedPlanet, focusPlanet, beltFocus, onPlanetClick }) {
   const positions = PLANETS.reduce((acc, p) => {
     acc[p.name] = getPlanetPosition(p.body, date)
     return acc
@@ -57,9 +81,18 @@ export default function SolarSystem({ date, selectedPlanet, focusPlanet, onPlane
 
   // Moon shares Earth's scene region — focus on Earth when Moon is selected
   const focusName = focusPlanet?.name === 'Moon' ? 'Earth' : focusPlanet?.name
-  const selectedScenePos = focusName && positions[focusName]
-    ? { x: positions[focusName].x * AU_SCALE, z: positions[focusName].z * AU_SCALE }
-    : null
+
+  const selectedScenePos = (() => {
+    if (!focusPlanet) return null
+    if (focusPlanet.comet) {
+      const { pos } = getHalleyPosition(date)
+      return { x: pos.x * AU_SCALE, z: pos.z * AU_SCALE }
+    }
+    if (focusName && positions[focusName]) {
+      return { x: positions[focusName].x * AU_SCALE, z: positions[focusName].z * AU_SCALE }
+    }
+    return null
+  })()
 
   return (
     <Canvas
@@ -69,6 +102,7 @@ export default function SolarSystem({ date, selectedPlanet, focusPlanet, onPlane
     >
       <Stars radius={700} depth={100} count={3000} factor={4} saturation={0} fade speed={0.5} />
       <CameraAnimator scenePos={selectedScenePos} />
+      <BeltCameraAnimator cameraY={beltFocus} />
 
       <Sun onClick={() => onPlanetClick(SUN_DATA)} />
 
@@ -86,6 +120,11 @@ export default function SolarSystem({ date, selectedPlanet, focusPlanet, onPlane
 
       <AsteroidBelt />
       <KuiperBelt />
+      <Comet
+        date={date}
+        isSelected={selectedPlanet?.name === "Halley's Comet"}
+        onClick={onPlanetClick}
+      />
 
       <MoonOrbit
         earthPosition={earthScenePos}

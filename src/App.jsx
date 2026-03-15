@@ -5,8 +5,10 @@ import DateControls from './components/DateControls'
 import SpeedControl from './components/SpeedControl'
 import InfoPanel from './components/InfoPanel'
 import SearchBar from './components/SearchBar'
+import ISSWidget from './components/ISSWidget'
 import { getElongationEvent } from './utils/astronomy'
 import { PLANETS } from './data/planets'
+import { useISS } from './hooks/useISS'
 
 export default function App() {
   const [date, setDate] = useState(new Date())
@@ -14,6 +16,8 @@ export default function App() {
   const [focusPlanet, setFocusPlanet] = useState(null)
   const [viewMode, setViewMode] = useState('solar') // 'solar' | 'night'
   const [speed, setSpeed] = useState(0) // days per second; 0 = paused
+  const [beltFocus, setBeltFocus] = useState(null) // cameraY to fly to for belt top-down view
+  const { iss, error: issError } = useISS(4000)
 
   // Animation loop — advances date at `speed` days/second, 20 ticks/s
   const speedRef = useRef(speed)
@@ -32,9 +36,16 @@ export default function App() {
       return ev ? [{ planet: p, ...ev }] : []
     }), [date])
 
-  const handleSearch = (planet) => {
-    setSelectedPlanet(planet)
-    setFocusPlanet(planet)
+  const handleSearch = (item) => {
+    if (item.type === 'belt') {
+      setSelectedPlanet(null)
+      setFocusPlanet(null)
+      setBeltFocus(item.cameraY)
+      return
+    }
+    setSelectedPlanet(item)
+    setFocusPlanet(item)
+    setBeltFocus(null)
   }
 
   const isToday = (() => {
@@ -59,6 +70,7 @@ export default function App() {
             </span>
           )}
           <SearchBar onSelect={handleSearch} />
+          <ISSWidget iss={iss} error={issError} onSelect={handleSearch} />
 
           {/* View toggle */}
           <button
@@ -100,6 +112,7 @@ export default function App() {
               date={date}
               selectedPlanet={selectedPlanet}
               focusPlanet={focusPlanet}
+              beltFocus={beltFocus}
               onPlanetClick={setSelectedPlanet}
             />
           ) : (
@@ -107,6 +120,7 @@ export default function App() {
               date={date}
               selectedPlanet={selectedPlanet}
               onPlanetClick={setSelectedPlanet}
+              issData={iss}
             />
           )}
         </Suspense>
@@ -135,6 +149,7 @@ export default function App() {
         planet={selectedPlanet}
         date={date}
         onClose={() => setSelectedPlanet(null)}
+        issData={iss}
       />
     </div>
   )

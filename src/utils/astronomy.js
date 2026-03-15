@@ -67,6 +67,102 @@ export function getPlanetPosition(bodyName, date) {
   return { x: vec.x, y: vec.z, z: vec.y }
 }
 
+// ---------------------------------------------------------------------------
+// Halley's Comet — Keplerian orbital elements (J2000.0 epoch)
+// ---------------------------------------------------------------------------
+const HALLEY = {
+  a:      17.834,    // semi-major axis (AU)
+  e:      0.96714,   // eccentricity (highly eccentric)
+  i:      162.26,    // inclination (°) — retrograde orbit
+  Omega:  58.42,     // longitude of ascending node (°)
+  omega:  111.33,    // argument of perihelion (°)
+  T0:     2446470.5, // last perihelion JD (Feb 9, 1986)
+  period: 27502.0,   // orbital period (days, ~75.3 years)
+}
+
+/** Heliocentric ecliptic XYZ (AU) for Halley's Comet. */
+function halleyEcliptic(date) {
+  const { a, e, i, Omega, omega, T0, period } = HALLEY
+  const jd = date.getTime() / 86_400_000 + 2_440_587.5
+  const t  = ((jd - T0) % period + period) % period  // days since last perihelion
+
+  let M = (2 * Math.PI / period) * t
+
+  // Newton-Raphson — needed for high eccentricity (e ≈ 0.967)
+  let E = M < Math.PI ? M + e / 2 : M - e / 2
+  for (let j = 0; j < 50; j++) {
+    const dE = (M - E + e * Math.sin(E)) / (1 - e * Math.cos(E))
+    E += dE
+    if (Math.abs(dE) < 1e-10) break
+  }
+
+  const nu = 2 * Math.atan2(Math.sqrt(1 + e) * Math.sin(E / 2), Math.sqrt(1 - e) * Math.cos(E / 2))
+  const r  = a * (1 - e * Math.cos(E))
+  const theta = omega * DEG + nu
+  const iR = i * DEG, OR = Omega * DEG
+
+  return {
+    x: r * (Math.cos(OR) * Math.cos(theta) - Math.sin(OR) * Math.sin(theta) * Math.cos(iR)),
+    y: r * (Math.sin(OR) * Math.cos(theta) + Math.cos(OR) * Math.sin(theta) * Math.cos(iR)),
+    z: r * Math.sin(theta) * Math.sin(iR),
+    distAU: r,
+  }
+}
+
+/**
+ * Returns scene-space position (AU, multiply by AU_SCALE) and Sun-distance for Halley's Comet.
+ */
+export function getHalleyPosition(date) {
+  const { x, y, z, distAU } = halleyEcliptic(date)
+  return { pos: { x, y: z, z: y }, distAU }
+}
+
+/**
+ * Compute altitude and azimuth of the ISS from a ground observer.
+ * Uses spherical-earth geometry with the ISS at a given altitude (km).
+ *
+ * altitude: degrees above the horizon (negative = below)
+ * azimuth:  compass bearing 0–360° (0=N, 90=E, ...)
+ */
+export function getISSAltAz(issLat, issLon, issAltKm, obsLat = 17.39, obsLon = 78.49) {
+  const D  = Math.PI / 180
+  const R  = 6371               // Earth mean radius (km)
+  const h  = issAltKm
+
+  const φ1 = obsLat * D, λ1 = obsLon * D
+  const φ2 = issLat * D, λ2 = issLon * D
+
+  // Great-circle angle between observer and sub-satellite point
+  const cosθ = Math.sin(φ1)*Math.sin(φ2) + Math.cos(φ1)*Math.cos(φ2)*Math.cos(λ2 - λ1)
+  const θ    = Math.acos(Math.max(-1, Math.min(1, cosθ)))
+
+  // Slant range (law of cosines)
+  const d    = Math.sqrt(R*R + (R+h)*(R+h) - 2*R*(R+h)*cosθ)
+
+  // Elevation angle
+  const sinε    = ((R+h)*cosθ - R) / d
+  const altitude = Math.asin(Math.max(-1, Math.min(1, sinε))) / D
+
+  // Azimuth to sub-satellite point
+  const Δλ     = λ2 - λ1
+  const y      = Math.sin(Δλ) * Math.cos(φ2)
+  const x      = Math.cos(φ1)*Math.sin(φ2) - Math.sin(φ1)*Math.cos(φ2)*Math.cos(Δλ)
+  const azimuth = ((Math.atan2(y, x) / D) + 360) % 360
+
+  return { altitude, azimuth }
+}
+
+/**
+ * Returns the date of Halley's next perihelion on or after the given date.
+ */
+export function getNextHalleyPerihelion(date) {
+  const { T0, period } = HALLEY
+  const jd = date.getTime() / 86_400_000 + 2_440_587.5
+  const n = Math.ceil((jd - T0) / period)
+  const nextJD = T0 + n * period
+  return new Date((nextJD - 2_440_587.5) * 86_400_000)
+}
+
 /**
  * Get distance from Earth to a planet in AU.
  */
@@ -75,6 +171,8 @@ export function getDistanceFromEarth(bodyName, date) {
   let px, py, pz
   if (bodyName === 'Ceres') {
     const c = ceresEcliptic(date); px = c.x; py = c.y; pz = c.z
+  } else if (bodyName === 'Halley') {
+    const h = halleyEcliptic(date); px = h.x; py = h.y; pz = h.z
   } else {
     const v = Astronomy.HelioVector(Astronomy.Body[bodyName], date); px = v.x; py = v.y; pz = v.z
   }
