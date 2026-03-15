@@ -91,6 +91,15 @@ export function getPlanetVisibility(bodyName, date) {
 export function getVisibilityExplanation(bodyName, date) {
   if (bodyName === 'Earth') return null
 
+  if (bodyName === 'Moon') {
+    const { name, illumination } = getMoonPhaseInfo(date)
+    const pct = Math.round(illumination * 100)
+    if (pct < 5) return `It's a New Moon — the Moon is between Earth and the Sun, with its lit side facing away from us. It rises and sets with the Sun and is not visible in the night sky.`
+    if (pct < 50) return `The Moon is a ${name} (${pct}% illuminated). It's visible in the ${illumination < 0.5 ? 'evening' : 'morning'} sky for part of the night.`
+    if (pct > 95) return `It's a Full Moon — the Moon is opposite the Sun and fully illuminated. It rises around sunset and is visible all night long.`
+    return `The Moon is a ${name} (${pct}% illuminated) and is well-placed for viewing tonight.`
+  }
+
   const innerPlanets = ['Mercury', 'Venus']
   const isInner = innerPlanets.includes(bodyName)
 
@@ -150,6 +159,154 @@ export function getElongationEvent(bodyName, date) {
     return null
   } catch {
     return null
+  }
+}
+
+/**
+ * Returns upcoming astronomical events for a planet, sorted by soonest first.
+ *
+ * Outer planets → next opposition + conjunction (SearchRelativeLongitude)
+ * Inner planets → next greatest elongation (SearchMaxElongation)
+ * Moon          → next full moon + new moon (SearchMoonPhase)
+ */
+export function getNextEvents(bodyName, date) {
+  if (bodyName === 'Earth') return []
+
+  const MS_PER_DAY = 86400000
+  const daysUntil = (d) => Math.round((d - date) / MS_PER_DAY)
+  const fmtDate = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+
+  try {
+    if (bodyName === 'Moon') {
+      const full = Astronomy.SearchMoonPhase(180, date, 35)
+      const newM = Astronomy.SearchMoonPhase(0, date, 35)
+      const events = []
+      if (full) events.push({ type: 'Full Moon', label: fmtDate(full.date), days: daysUntil(full.date), emoji: '🌕', color: '#d8d8d8' })
+      if (newM) events.push({ type: 'New Moon', label: fmtDate(newM.date), days: daysUntil(newM.date), emoji: '🌑', color: '#888' })
+      return events.sort((a, b) => a.days - b.days)
+    }
+
+    const body = Astronomy.Body[bodyName]
+    const outerPlanets = ['Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune']
+    const innerPlanets = ['Mercury', 'Venus']
+
+    if (outerPlanets.includes(bodyName)) {
+      const opp = Astronomy.SearchRelativeLongitude(body, 180, date)
+      const conj = Astronomy.SearchRelativeLongitude(body, 0, date)
+      const events = []
+      if (opp)  events.push({ type: 'Opposition',  label: fmtDate(opp.date),  days: daysUntil(opp.date),  emoji: '◉', color: '#ffaa00' })
+      if (conj) events.push({ type: 'Conjunction', label: fmtDate(conj.date), days: daysUntil(conj.date), emoji: '☌', color: '#64a0ff' })
+      return events.sort((a, b) => a.days - b.days)
+    }
+
+    if (innerPlanets.includes(bodyName)) {
+      const ev = Astronomy.SearchMaxElongation(body, date)
+      if (!ev) return []
+      const side = ev.visibility === 'morning' ? 'Morning' : 'Evening'
+      return [{
+        type: `Greatest Elongation`,
+        sublabel: `${side} sky · ${Math.round(ev.elongation)}° from Sun`,
+        label: fmtDate(ev.time.date),
+        days: daysUntil(ev.time.date),
+        emoji: ev.visibility === 'morning' ? '🌅' : '🌇',
+        color: '#e8cda0',
+      }]
+    }
+
+    return []
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Returns the normalized geocentric direction of the Moon relative to Earth,
+ * in scene coordinates (x = ecliptic x, z = ecliptic y).
+ * Used to place the Moon at the correct angular position around Earth in the solar system view.
+ */
+export function getMoonGeocentricDirection(date) {
+  const earthVec = Astronomy.HelioVector(Astronomy.Body.Earth, date)
+  const moonVec = Astronomy.HelioVector(Astronomy.Body.Moon, date)
+  const dx = moonVec.x - earthVec.x   // ecliptic x → scene x
+  const dz = moonVec.y - earthVec.y   // ecliptic y → scene z
+  const len = Math.sqrt(dx * dx + dz * dz) || 1
+  return { x: dx / len, z: dz / len }
+}
+
+/**
+ * Returns Moon phase angle in degrees (0–360).
+ * 0 = New Moon, 90 = First Quarter, 180 = Full Moon, 270 = Last Quarter.
+ */
+export function getMoonPhase(date) {
+  return Astronomy.MoonPhase(date)
+}
+
+/**
+ * Returns Moon phase name and illumination fraction (0–1).
+ */
+export function getMoonPhaseInfo(date) {
+  const deg = Astronomy.MoonPhase(date)
+  const illumination = (1 - Math.cos((deg * Math.PI) / 180)) / 2
+
+  let name, emoji
+  if (deg < 22.5 || deg >= 337.5)      { name = 'New Moon';        emoji = '🌑' }
+  else if (deg < 67.5)                  { name = 'Waxing Crescent'; emoji = '🌒' }
+  else if (deg < 112.5)                 { name = 'First Quarter';   emoji = '🌓' }
+  else if (deg < 157.5)                 { name = 'Waxing Gibbous';  emoji = '🌔' }
+  else if (deg < 202.5)                 { name = 'Full Moon';       emoji = '🌕' }
+  else if (deg < 247.5)                 { name = 'Waning Gibbous';  emoji = '🌖' }
+  else if (deg < 292.5)                 { name = 'Last Quarter';    emoji = '🌗' }
+  else                                  { name = 'Waning Crescent'; emoji = '🌘' }
+
+  return { name, emoji, illumination, degrees: Math.round(deg) }
+}
+
+/**
+ * Get altitude and azimuth of a body from the observer's location.
+ * Altitude: degrees above horizon (negative = below horizon)
+ * Azimuth: compass bearing (0=N, 90=E, 180=S, 270=W)
+ */
+export function getPlanetAltAz(bodyName, date, lat = 17.39, lon = 78.49) {
+  try {
+    const body = Astronomy.Body[bodyName]
+    const observer = new Astronomy.Observer(lat, lon, 0)
+    const equatorial = Astronomy.Equator(body, date, observer, true, true)
+    const horizontal = Astronomy.Horizon(date, observer, equatorial.ra, equatorial.dec, 'normal')
+    return { altitude: horizontal.altitude, azimuth: horizontal.azimuth }
+  } catch {
+    return { altitude: -90, azimuth: 0 }
+  }
+}
+
+/**
+ * Returns sunrise, solar noon, sunset, and day length for the observer.
+ */
+export function getSunTimes(date, lat = 17.39, lon = 78.49) {
+  try {
+    const observer = new Astronomy.Observer(lat, lon, 0)
+    const startOfDay = new Date(date)
+    startOfDay.setHours(0, 0, 0, 0)
+
+    const rise = Astronomy.SearchRiseSet(Astronomy.Body.Sun, observer, +1, startOfDay, 1)
+    const set  = Astronomy.SearchRiseSet(Astronomy.Body.Sun, observer, -1, startOfDay, 1)
+    const noon = Astronomy.SearchHourAngle(Astronomy.Body.Sun, observer, 0, startOfDay, +1)
+
+    const fmt = (d) => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+
+    let dayLength = null
+    if (rise?.date && set?.date) {
+      const mins = Math.round((set.date - rise.date) / 60000)
+      dayLength = `${Math.floor(mins / 60)}h ${mins % 60}m`
+    }
+
+    return {
+      rise: rise?.date ? fmt(rise.date) : 'N/A',
+      set:  set?.date  ? fmt(set.date)  : 'N/A',
+      noon: noon?.time?.date ? fmt(noon.time.date) : 'N/A',
+      dayLength,
+    }
+  } catch {
+    return { rise: 'N/A', set: 'N/A', noon: 'N/A', dayLength: null }
   }
 }
 

@@ -1,6 +1,8 @@
-import { useState, Suspense, useMemo } from 'react'
+import { useState, Suspense, useMemo, useEffect, useRef } from 'react'
 import SolarSystem from './components/SolarSystem'
+import NightSkyView from './components/NightSkyView'
 import DateControls from './components/DateControls'
+import SpeedControl from './components/SpeedControl'
 import InfoPanel from './components/InfoPanel'
 import SearchBar from './components/SearchBar'
 import { getElongationEvent } from './utils/astronomy'
@@ -10,6 +12,19 @@ export default function App() {
   const [date, setDate] = useState(new Date())
   const [selectedPlanet, setSelectedPlanet] = useState(null)
   const [focusPlanet, setFocusPlanet] = useState(null)
+  const [viewMode, setViewMode] = useState('solar') // 'solar' | 'night'
+  const [speed, setSpeed] = useState(0) // days per second; 0 = paused
+
+  // Animation loop — advances date at `speed` days/second, 20 ticks/s
+  const speedRef = useRef(speed)
+  useEffect(() => { speedRef.current = speed }, [speed])
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (speedRef.current === 0) return
+      setDate(d => new Date(d.getTime() + speedRef.current * (1 / 20) * 86_400_000))
+    }, 50)
+    return () => clearInterval(id)
+  }, [])
 
   const activeEvents = useMemo(() =>
     PLANETS.flatMap((p) => {
@@ -44,14 +59,32 @@ export default function App() {
             </span>
           )}
           <SearchBar onSelect={handleSearch} />
+
+          {/* View toggle */}
+          <button
+            onClick={() => setViewMode(m => m === 'solar' ? 'night' : 'solar')}
+            className="text-[11px] px-3 py-1 rounded-full border transition-colors"
+            style={viewMode === 'night'
+              ? { background: 'rgba(100,180,255,0.15)', border: '1px solid rgba(100,180,255,0.4)', color: '#88ccff' }
+              : { background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.6)' }
+            }
+          >
+            {viewMode === 'solar' ? '🌙 Night Sky' : '☀️ Solar System'}
+          </button>
         </div>
 
-        <div className="pointer-events-auto">
+        <div className="pointer-events-auto flex flex-col items-center gap-1.5">
           <DateControls date={date} onChange={setDate} />
+          <SpeedControl speed={speed} onChange={setSpeed} />
         </div>
 
         <p className="text-white/30 text-[11px] pointer-events-none mt-1">
-          Drag to rotate · Scroll to zoom · Click a planet for details
+          {speed !== 0
+            ? `${Math.abs(speed) >= 365 ? `${Math.round(Math.abs(speed) / 365)}yr` : Math.abs(speed) >= 30 ? `${Math.round(Math.abs(speed) / 30)}mo` : `${Math.abs(speed)}d`}/s ${speed < 0 ? '← rewinding' : '→ advancing'}`
+            : viewMode === 'solar'
+              ? 'Drag to rotate · Scroll to zoom · Click a planet for details'
+              : 'Drag to look around · Click a planet for details · Observer: Hyderabad, India'
+          }
         </p>
       </header>
 
@@ -59,15 +92,23 @@ export default function App() {
       <div className="flex-1">
         <Suspense fallback={
           <div className="w-full h-full flex items-center justify-center text-white/50">
-            Loading solar system…
+            Loading…
           </div>
         }>
-          <SolarSystem
-            date={date}
-            selectedPlanet={selectedPlanet}
-            focusPlanet={focusPlanet}
-            onPlanetClick={setSelectedPlanet}
-          />
+          {viewMode === 'solar' ? (
+            <SolarSystem
+              date={date}
+              selectedPlanet={selectedPlanet}
+              focusPlanet={focusPlanet}
+              onPlanetClick={setSelectedPlanet}
+            />
+          ) : (
+            <NightSkyView
+              date={date}
+              selectedPlanet={selectedPlanet}
+              onPlanetClick={setSelectedPlanet}
+            />
+          )}
         </Suspense>
       </div>
 

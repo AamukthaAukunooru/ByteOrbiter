@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getDistanceFromEarth, getPlanetVisibility, getRiseSet, getVisibilityExplanation } from '../utils/astronomy'
+import { getDistanceFromEarth, getPlanetVisibility, getRiseSet, getVisibilityExplanation, getMoonPhaseInfo, getNextEvents, getSunTimes } from '../utils/astronomy'
 
 const AU_TO_KM = 149_597_870.7
 
@@ -9,18 +9,24 @@ export default function InfoPanel({ planet, date, onClose }) {
   useEffect(() => {
     if (!planet) { setInfo(null); return }
 
-    const distAU = planet.name === 'Earth' ? 0 : getDistanceFromEarth(planet.body, date)
-    const visibility = getPlanetVisibility(planet.body, date)
-    const riseSet = getRiseSet(planet.body, date)
-    const explanation = getVisibilityExplanation(planet.body, date)
+    const isSun = planet.name === 'Sun'
+    const isEarth = planet.name === 'Earth'
 
-    setInfo({ distAU, visibility, riseSet, explanation })
+    const distAU = (isSun || isEarth) ? null : getDistanceFromEarth(planet.body, date)
+    const visibility = (isSun || isEarth) ? null : getPlanetVisibility(planet.body, date)
+    const riseSet = (isSun || isEarth) ? null : getRiseSet(planet.body, date)
+    const explanation = (isSun || isEarth) ? null : getVisibilityExplanation(planet.body, date)
+    const moonPhase = planet.name === 'Moon' ? getMoonPhaseInfo(date) : null
+    const nextEvents = (isSun || isEarth) ? [] : getNextEvents(planet.body, date)
+    const sunTimes = isSun ? getSunTimes(date) : null
+
+    setInfo({ distAU, visibility, riseSet, explanation, moonPhase, nextEvents, sunTimes })
   }, [planet, date])
 
   if (!planet) return null
 
-  const distKm = info ? (info.distAU * AU_TO_KM).toLocaleString(undefined, { maximumFractionDigits: 0 }) : '—'
-  const distAU = info ? info.distAU.toFixed(3) : '—'
+  const distKm = info?.distAU != null ? (info.distAU * AU_TO_KM).toLocaleString(undefined, { maximumFractionDigits: 0 }) : '—'
+  const distAU = info?.distAU != null ? info.distAU.toFixed(planet?.name === 'Moon' ? 6 : 3) : '—'
 
   return (
     <>
@@ -61,8 +67,55 @@ export default function InfoPanel({ planet, date, onClose }) {
           </button>
         </div>
 
+        {/* Moon phase */}
+        {planet.name === 'Moon' && info?.moonPhase && (
+          <section className="mb-4">
+            <h3 className="text-xs uppercase tracking-widest text-white/40 mb-2">Current Phase</h3>
+            <div className="bg-white/5 rounded-lg p-3">
+              <div className="flex items-center gap-3">
+                <span className="text-4xl">{info.moonPhase.emoji}</span>
+                <div>
+                  <div className="text-base font-semibold text-white">{info.moonPhase.name}</div>
+                  <div className="text-sm text-white/60">{Math.round(info.moonPhase.illumination * 100)}% illuminated</div>
+                  <div className="text-xs text-white/35 mt-0.5">{info.moonPhase.degrees}° from New Moon</div>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Sun-specific: solar times */}
+        {planet.name === 'Sun' && info?.sunTimes && (
+          <section className="mb-4">
+            <h3 className="text-xs uppercase tracking-widest text-white/40 mb-2">Today's Solar Times</h3>
+            <div className="bg-white/5 rounded-lg p-3 space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <div className="text-[10px] text-white/40 uppercase tracking-wider">Sunrise</div>
+                  <div className="text-sm font-semibold text-yellow-400">{info.sunTimes.rise}</div>
+                </div>
+                <div>
+                  <div className="text-[10px] text-white/40 uppercase tracking-wider">Sunset</div>
+                  <div className="text-sm font-semibold text-orange-400">{info.sunTimes.set}</div>
+                </div>
+                <div>
+                  <div className="text-[10px] text-white/40 uppercase tracking-wider">Solar Noon</div>
+                  <div className="text-sm font-semibold text-white">{info.sunTimes.noon}</div>
+                </div>
+                <div>
+                  <div className="text-[10px] text-white/40 uppercase tracking-wider">Day Length</div>
+                  <div className="text-sm font-semibold text-white">{info.sunTimes.dayLength ?? '—'}</div>
+                </div>
+              </div>
+              <div className="text-white/30 text-[10px] pt-1 border-t border-white/10">
+                Times for Hyderabad, India (17.39°N, 78.49°E)
+              </div>
+            </div>
+          </section>
+        )}
+
         {/* Distance */}
-        {planet.name !== 'Earth' && (
+        {info?.distAU != null && (
           <section className="mb-4">
             <h3 className="text-xs uppercase tracking-widest text-white/40 mb-2">Distance from Earth</h3>
             <div className="bg-white/5 rounded-lg p-3 space-y-1">
@@ -73,7 +126,7 @@ export default function InfoPanel({ planet, date, onClose }) {
         )}
 
         {/* Visibility */}
-        {planet.name !== 'Earth' && info && (
+        {info?.visibility && (
           <section className="mb-4">
             <h3 className="text-xs uppercase tracking-widest text-white/40 mb-2">Visibility Tonight</h3>
             <div className="bg-white/5 rounded-lg p-3 space-y-2">
@@ -96,11 +149,38 @@ export default function InfoPanel({ planet, date, onClose }) {
         )}
 
         {/* Why can't I see it? */}
-        {planet.name !== 'Earth' && info?.explanation && (
+        {info?.explanation && (
           <section className="mb-4">
             <h3 className="text-xs uppercase tracking-widest text-white/40 mb-2">Can I see it tonight?</h3>
             <div className="bg-white/5 rounded-lg p-3">
               <p className="text-sm text-white/70 leading-relaxed">{info.explanation}</p>
+            </div>
+          </section>
+        )}
+
+        {/* Next Events */}
+        {info?.nextEvents?.length > 0 && (
+          <section className="mb-4">
+            <h3 className="text-xs uppercase tracking-widest text-white/40 mb-2">Next Events</h3>
+            <div className="space-y-2">
+              {info.nextEvents.map((ev, i) => (
+                <div key={i} className="bg-white/5 rounded-lg p-3 flex items-start gap-3">
+                  <span className="text-lg leading-none mt-0.5">{ev.emoji}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-semibold text-white">{ev.type}</span>
+                      <span
+                        className="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0"
+                        style={{ background: `${ev.color}22`, border: `1px solid ${ev.color}66`, color: ev.color }}
+                      >
+                        {ev.days === 0 ? 'Today' : ev.days === 1 ? 'Tomorrow' : `${ev.days}d`}
+                      </span>
+                    </div>
+                    <div className="text-xs text-white/50 mt-0.5">{ev.label}</div>
+                    {ev.sublabel && <div className="text-xs text-white/35 mt-0.5">{ev.sublabel}</div>}
+                  </div>
+                </div>
+              ))}
             </div>
           </section>
         )}

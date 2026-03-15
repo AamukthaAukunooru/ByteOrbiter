@@ -106,6 +106,33 @@ export const PLANETS = [
   },
 ]
 
+export const SUN_DATA = {
+  name: 'Sun',
+  body: 'Sun',
+  color: '#FDB813',
+  emoji: '☀',
+  facts: [
+    'Contains 99.86% of the total mass of the entire Solar System',
+    'Light takes ~8 minutes 20 seconds to travel from the Sun to Earth',
+    'Surface temperature is ~5,500°C; the core reaches ~15 million°C',
+    'The Sun will exhaust its hydrogen and become a red giant in ~5 billion years',
+  ],
+}
+
+export const MOON_DATA = {
+  name: 'Moon',
+  body: 'Moon',
+  color: '#c8c8c8',
+  radius: 0.27, // relative to Earth
+  emoji: '🌕',
+  facts: [
+    'Only natural satellite of Earth, at ~384,400 km away',
+    'Causes ocean tides through its gravitational pull',
+    'Always shows the same face — its rotation matches its orbital period',
+    'The Moon is slowly drifting away from Earth at ~3.8 cm per year',
+  ],
+}
+
 // Scale factors for display (not real scale — for readability)
 // Orbital radii in AU → mapped to scene units (1 AU = 6 scene units)
 export const AU_SCALE = 6

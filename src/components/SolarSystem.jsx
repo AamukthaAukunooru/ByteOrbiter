@@ -4,8 +4,10 @@ import { OrbitControls, Stars } from '@react-three/drei'
 import * as THREE from 'three'
 import Sun from './Sun'
 import Planet from './Planet'
+import MoonOrbit from './Moon'
+import AsteroidBelt from './AsteroidBelt'
 import { getPlanetPosition, getElongationEvent } from '../utils/astronomy'
-import { PLANETS, AU_SCALE } from '../data/planets'
+import { PLANETS, AU_SCALE, SUN_DATA } from '../data/planets'
 
 function CameraAnimator({ scenePos }) {
   const { camera } = useThree()
@@ -41,13 +43,21 @@ export default function SolarSystem({ date, selectedPlanet, focusPlanet, onPlane
     return acc
   }, {})
 
+  const earthScenePos = [
+    positions['Earth'].x * AU_SCALE,
+    0,
+    positions['Earth'].z * AU_SCALE,
+  ]
+
   const events = PLANETS.reduce((acc, p) => {
     acc[p.name] = getElongationEvent(p.body, date)
     return acc
   }, {})
 
-  const selectedScenePos = focusPlanet
-    ? { x: positions[focusPlanet.name].x * AU_SCALE, z: positions[focusPlanet.name].z * AU_SCALE }
+  // Moon shares Earth's scene region — focus on Earth when Moon is selected
+  const focusName = focusPlanet?.name === 'Moon' ? 'Earth' : focusPlanet?.name
+  const selectedScenePos = focusName && positions[focusName]
+    ? { x: positions[focusName].x * AU_SCALE, z: positions[focusName].z * AU_SCALE }
     : null
 
   return (
@@ -59,7 +69,7 @@ export default function SolarSystem({ date, selectedPlanet, focusPlanet, onPlane
       <Stars radius={300} depth={60} count={3000} factor={4} saturation={0} fade speed={0.5} />
       <CameraAnimator scenePos={selectedScenePos} />
 
-      <Sun />
+      <Sun onClick={() => onPlanetClick(SUN_DATA)} />
 
       {PLANETS.map((planet) => (
         <Planet
@@ -72,6 +82,15 @@ export default function SolarSystem({ date, selectedPlanet, focusPlanet, onPlane
           onClick={onPlanetClick}
         />
       ))}
+
+      <AsteroidBelt />
+
+      <MoonOrbit
+        earthPosition={earthScenePos}
+        date={date}
+        isSelected={selectedPlanet?.name === 'Moon'}
+        onClick={onPlanetClick}
+      />
 
       <OrbitControls
         enablePan={true}
