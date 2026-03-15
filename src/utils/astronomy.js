@@ -86,6 +86,74 @@ export function getPlanetVisibility(bodyName, date) {
 }
 
 /**
+ * Returns a plain-English explanation of why a planet is or isn't visible.
+ */
+export function getVisibilityExplanation(bodyName, date) {
+  if (bodyName === 'Earth') return null
+
+  const innerPlanets = ['Mercury', 'Venus']
+  const isInner = innerPlanets.includes(bodyName)
+
+  try {
+    const body = Astronomy.Body[bodyName]
+    const elong = Astronomy.Elongation(body, date)
+    const deg = Math.round(elong.elongation)
+    const side = elong.visibility === 'morning' ? 'morning' : 'evening'
+    const sideDesc = side === 'morning' ? 'eastern sky before sunrise' : 'western sky after sunset'
+
+    if (deg < 10) {
+      if (isInner) {
+        return `${bodyName} is in conjunction — it's almost directly between us and the Sun (or just behind it). It rises and sets with the Sun and is completely lost in the solar glare. Not visible right now.`
+      }
+      return `${bodyName} is in conjunction — it's on the far side of the Sun from Earth. The Sun's glare completely drowns it out. Not visible right now.`
+    }
+
+    if (deg < 20) {
+      return `${bodyName} is only ${deg}° from the Sun, which is very close. It hugs the horizon in the ${sideDesc} and sets (or rises) shortly after (or before) the Sun. Extremely difficult to see.`
+    }
+
+    if (isInner) {
+      if (deg < 35) {
+        return `${bodyName} is ${deg}° from the Sun. Look for it low in the ${sideDesc} — you have a short window to spot it before it disappears below the horizon.`
+      }
+      return `${bodyName} is at a good elongation of ${deg}° from the Sun. This is near its greatest separation, making it one of the better times to observe it in the ${sideDesc}.`
+    }
+
+    // Outer planets
+    if (deg < 90) {
+      return `${bodyName} is ${deg}° from the Sun, visible in the ${sideDesc}. It rises a few hours after sunset (or sets before sunrise) so your viewing window is limited to part of the night.`
+    }
+
+    if (deg < 160) {
+      return `${bodyName} is ${deg}° from the Sun — well clear of the solar glare. It's up for most of the night and well-placed for observation.`
+    }
+
+    return `${bodyName} is ${deg}° from the Sun — nearly at opposition! It rises around sunset, is visible all night, and is closer to Earth than usual. This is the best time of year to observe it.`
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Returns 'opposition', 'conjunction', or null for a planet on a given date.
+ * Opposition: elongation > 170° (planet opposite the Sun)
+ * Conjunction: elongation < 10° (planet near the Sun)
+ */
+export function getElongationEvent(bodyName, date) {
+  if (bodyName === 'Earth') return null
+  try {
+    const body = Astronomy.Body[bodyName]
+    const elong = Astronomy.Elongation(body, date)
+    const deg = elong.elongation
+    if (deg > 160) return { type: 'opposition', elongation: Math.round(deg) }
+    if (deg < 15) return { type: 'conjunction', elongation: Math.round(deg) }
+    return null
+  } catch {
+    return null
+  }
+}
+
+/**
  * Get rise/set times for a planet from a given observer location.
  */
 export function getRiseSet(bodyName, date, lat = 17.39, lon = 78.49) {

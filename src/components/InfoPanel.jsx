@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getDistanceFromEarth, getPlanetVisibility, getRiseSet } from '../utils/astronomy'
+import { getDistanceFromEarth, getPlanetVisibility, getRiseSet, getVisibilityExplanation } from '../utils/astronomy'
 
 const AU_TO_KM = 149_597_870.7
 
@@ -12,8 +12,9 @@ export default function InfoPanel({ planet, date, onClose }) {
     const distAU = planet.name === 'Earth' ? 0 : getDistanceFromEarth(planet.body, date)
     const visibility = getPlanetVisibility(planet.body, date)
     const riseSet = getRiseSet(planet.body, date)
+    const explanation = getVisibilityExplanation(planet.body, date)
 
-    setInfo({ distAU, visibility, riseSet })
+    setInfo({ distAU, visibility, riseSet, explanation })
   }, [planet, date])
 
   if (!planet) return null
@@ -90,6 +91,16 @@ export default function InfoPanel({ planet, date, onClose }) {
                   <div className="text-white/30 text-[10px] mt-1">Times shown for Hyderabad, India (17.39°N, 78.49°E)</div>
                 </div>
               )}
+            </div>
+          </section>
+        )}
+
+        {/* Why can't I see it? */}
+        {planet.name !== 'Earth' && info?.explanation && (
+          <section className="mb-4">
+            <h3 className="text-xs uppercase tracking-widest text-white/40 mb-2">Can I see it tonight?</h3>
+            <div className="bg-white/5 rounded-lg p-3">
+              <p className="text-sm text-white/70 leading-relaxed">{info.explanation}</p>
             </div>
           </section>
         )}

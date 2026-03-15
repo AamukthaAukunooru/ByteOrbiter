@@ -70,6 +70,7 @@ export const PLANETS = [
     color: '#e4d191',
     radius: 9.45,
     emoji: '♄',
+    rings: { innerMult: 1.2, outerMult: 2.2, color: '#c8b97a', tilt: 27 },
     facts: [
       'Its iconic rings are made of ice and rock',
       'Less dense than water — it would float!',
