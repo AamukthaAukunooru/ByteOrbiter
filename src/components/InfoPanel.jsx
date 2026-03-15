@@ -58,6 +58,12 @@ export default function InfoPanel({ planet, date, onClose }) {
             <h2 className="text-xl font-bold" style={{ color: planet.color }}>
               {planet.name}
             </h2>
+            {planet.dwarf && (
+              <span className="text-[9px] px-1.5 py-0.5 rounded-full font-semibold"
+                style={{ background: 'rgba(180,140,255,0.15)', border: '1px solid rgba(180,140,255,0.4)', color: '#c4a0ff' }}>
+                Dwarf Planet
+              </span>
+            )}
           </div>
           <button
             onClick={onClose}

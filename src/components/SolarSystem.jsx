@@ -6,6 +6,7 @@ import Sun from './Sun'
 import Planet from './Planet'
 import MoonOrbit from './Moon'
 import AsteroidBelt from './AsteroidBelt'
+import KuiperBelt from './KuiperBelt'
 import { getPlanetPosition, getElongationEvent } from '../utils/astronomy'
 import { PLANETS, AU_SCALE, SUN_DATA } from '../data/planets'
 
@@ -62,11 +63,11 @@ export default function SolarSystem({ date, selectedPlanet, focusPlanet, onPlane
 
   return (
     <Canvas
-      camera={{ position: [0, 40, 0], fov: 55, near: 0.1, far: 1000 }}
+      camera={{ position: [0, 40, 0], fov: 55, near: 0.1, far: 2000 }}
       style={{ background: 'transparent' }}
       onPointerMissed={() => onPlanetClick(null)}
     >
-      <Stars radius={300} depth={60} count={3000} factor={4} saturation={0} fade speed={0.5} />
+      <Stars radius={700} depth={100} count={3000} factor={4} saturation={0} fade speed={0.5} />
       <CameraAnimator scenePos={selectedScenePos} />
 
       <Sun onClick={() => onPlanetClick(SUN_DATA)} />
@@ -84,6 +85,7 @@ export default function SolarSystem({ date, selectedPlanet, focusPlanet, onPlane
       ))}
 
       <AsteroidBelt />
+      <KuiperBelt />
 
       <MoonOrbit
         earthPosition={earthScenePos}
@@ -97,7 +99,7 @@ export default function SolarSystem({ date, selectedPlanet, focusPlanet, onPlane
         enableZoom={true}
         enableRotate={true}
         minDistance={5}
-        maxDistance={150}
+        maxDistance={400}
         makeDefault
       />
     </Canvas>

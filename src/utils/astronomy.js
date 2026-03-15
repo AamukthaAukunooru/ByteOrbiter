@@ -1,26 +1,84 @@
 import * as Astronomy from 'astronomy-engine'
 
+// ---------------------------------------------------------------------------
+// Ceres — Keplerian orbital elements (J2000.0 epoch)
+// ---------------------------------------------------------------------------
+const CERES = {
+  a:      2.7691,    // semi-major axis (AU)
+  e:      0.07570,   // eccentricity
+  i:      10.587,    // inclination (°)
+  Omega:  80.329,    // longitude of ascending node (°)
+  omega:  73.115,    // argument of perihelion (°)
+  M0:     95.989,    // mean anomaly at J2000.0 (°)
+  period: 1681.63,   // orbital period (days)
+}
+const DEG = Math.PI / 180
+const OBLIQUITY = 23.439 * DEG   // Earth's axial tilt, used for ecliptic→equatorial
+
+/** Heliocentric ecliptic XYZ for Ceres in AU (raw, not Three.js swapped). */
+function ceresEcliptic(date) {
+  const { a, e, i, Omega, omega, M0, period } = CERES
+  const jd = date.getTime() / 86_400_000 + 2_440_587.5
+  const t  = jd - 2_451_545.0   // days since J2000.0
+
+  let M = ((M0 * DEG + (2 * Math.PI / period) * t) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI)
+
+  // Solve Kepler's equation iteratively (converges fast for e ≈ 0.076)
+  let E = M
+  for (let j = 0; j < 12; j++) E = M + e * Math.sin(E)
+
+  const nu = 2 * Math.atan2(Math.sqrt(1 + e) * Math.sin(E / 2), Math.sqrt(1 - e) * Math.cos(E / 2))
+  const r  = a * (1 - e * Math.cos(E))
+
+  const theta = omega * DEG + nu
+  const iR = i * DEG, OR = Omega * DEG
+
+  return {
+    x: r * (Math.cos(OR) * Math.cos(theta) - Math.sin(OR) * Math.sin(theta) * Math.cos(iR)),
+    y: r * (Math.sin(OR) * Math.cos(theta) + Math.cos(OR) * Math.sin(theta) * Math.cos(iR)),
+    z: r * Math.sin(theta) * Math.sin(iR),
+  }
+}
+
+/** Elongation of Ceres from Earth in degrees (0–180). */
+function ceresElongation(date) {
+  const ev = Astronomy.HelioVector(Astronomy.Body.Earth, date)
+  const cv = ceresEcliptic(date)
+  // Vector Earth→Sun and Earth→Ceres
+  const sx = -ev.x, sy = -ev.y, sz = -ev.z
+  const cx = cv.x - ev.x, cy = cv.y - ev.y, cz = cv.z - ev.z
+  const dot = sx*cx + sy*cy + sz*cz
+  const ls  = Math.sqrt(sx*sx + sy*sy + sz*sz)
+  const lc  = Math.sqrt(cx*cx + cy*cy + cz*cz)
+  return Math.acos(Math.max(-1, Math.min(1, dot / (ls * lc)))) / DEG
+}
+
 /**
  * Returns the heliocentric (x, z) position of a planet in AU for a given date.
  * x and z map to the orbital plane; y is elevation (usually near 0).
  */
 export function getPlanetPosition(bodyName, date) {
+  if (bodyName === 'Ceres') {
+    const { x, y, z } = ceresEcliptic(date)
+    return { x, y: z, z: y }  // same y/z swap as other bodies
+  }
   const body = Astronomy.Body[bodyName]
   const vec = Astronomy.HelioVector(body, date)
-  return { x: vec.x, y: vec.z, z: vec.y } // swap y/z for Three.js (y-up)
+  return { x: vec.x, y: vec.z, z: vec.y }
 }
 
 /**
  * Get distance from Earth to a planet in AU.
  */
 export function getDistanceFromEarth(bodyName, date) {
-  const body = Astronomy.Body[bodyName]
-  const earthVec = Astronomy.HelioVector(Astronomy.Body.Earth, date)
-  const planetVec = Astronomy.HelioVector(body, date)
-  const dx = planetVec.x - earthVec.x
-  const dy = planetVec.y - earthVec.y
-  const dz = planetVec.z - earthVec.z
-  return Math.sqrt(dx * dx + dy * dy + dz * dz)
+  const ev = Astronomy.HelioVector(Astronomy.Body.Earth, date)
+  let px, py, pz
+  if (bodyName === 'Ceres') {
+    const c = ceresEcliptic(date); px = c.x; py = c.y; pz = c.z
+  } else {
+    const v = Astronomy.HelioVector(Astronomy.Body[bodyName], date); px = v.x; py = v.y; pz = v.z
+  }
+  return Math.sqrt((px-ev.x)**2 + (py-ev.y)**2 + (pz-ev.z)**2)
 }
 
 /**
@@ -36,10 +94,12 @@ export function getOrbitPath(bodyName, date, samples = 180) {
     Venus: 224.7,
     Earth: 365.25,
     Mars: 686.97,
+    Ceres: 1681.63,
     Jupiter: 4332.59,
     Saturn: 10759.22,
     Uranus: 30688.5,
     Neptune: 60182.0,
+    Pluto: 90560.0,
   }
 
   const period = periods[bodyName] || 365.25
@@ -48,8 +108,13 @@ export function getOrbitPath(bodyName, date, samples = 180) {
 
   for (let i = 0; i < samples; i++) {
     const t = new Date(date.getTime() - (period / 2) * msPerDay + (i / samples) * period * msPerDay)
-    const vec = Astronomy.HelioVector(body, t)
-    points.push({ x: vec.x, y: vec.z, z: vec.y })
+    if (bodyName === 'Ceres') {
+      const { x, y, z } = ceresEcliptic(t)
+      points.push({ x, y: z, z: y })
+    } else {
+      const vec = Astronomy.HelioVector(body, t)
+      points.push({ x: vec.x, y: vec.z, z: vec.y })
+    }
   }
 
   return points
@@ -64,6 +129,16 @@ export function getPlanetVisibility(bodyName, date) {
   if (bodyName === 'Earth') return { visible: false, elongation: 0, phase: 'N/A' }
 
   try {
+    if (bodyName === 'Ceres') {
+      const deg = ceresElongation(date)
+      const isVisible = deg > 15
+      let phase = 'Not visible (too close to Sun)'
+      if (deg > 15 && deg <= 90) phase = 'Visible part of night'
+      else if (deg > 90 && deg <= 150) phase = 'Visible most of the night'
+      else if (deg > 150) phase = 'Near opposition (visible all night)'
+      return { visible: isVisible, elongation: Math.round(deg), phase }
+    }
+
     const body = Astronomy.Body[bodyName]
     const elong = Astronomy.Elongation(body, date)
     const elongDeg = elong.elongation
@@ -90,6 +165,16 @@ export function getPlanetVisibility(bodyName, date) {
  */
 export function getVisibilityExplanation(bodyName, date) {
   if (bodyName === 'Earth') return null
+
+  if (bodyName === 'Ceres') {
+    try {
+      const deg = Math.round(ceresElongation(date))
+      if (deg < 15) return `Ceres is in conjunction — lost in the Sun's glare and not visible right now.`
+      if (deg < 90) return `Ceres is ${deg}° from the Sun. It's too faint for the naked eye (magnitude ~7–9), but well-placed for binoculars or a small telescope.`
+      if (deg < 160) return `Ceres is ${deg}° from the Sun and up for most of the night — a good time to observe it through binoculars or a telescope.`
+      return `Ceres is near opposition (${deg}° from the Sun) — closest to Earth and at peak brightness. Best time of year to observe it.`
+    } catch { return null }
+  }
 
   if (bodyName === 'Moon') {
     const { name, illumination } = getMoonPhaseInfo(date)
@@ -151,11 +236,11 @@ export function getVisibilityExplanation(bodyName, date) {
 export function getElongationEvent(bodyName, date) {
   if (bodyName === 'Earth') return null
   try {
-    const body = Astronomy.Body[bodyName]
-    const elong = Astronomy.Elongation(body, date)
-    const deg = elong.elongation
+    const deg = bodyName === 'Ceres'
+      ? ceresElongation(date)
+      : Astronomy.Elongation(Astronomy.Body[bodyName], date).elongation
     if (deg > 160) return { type: 'opposition', elongation: Math.round(deg) }
-    if (deg < 15) return { type: 'conjunction', elongation: Math.round(deg) }
+    if (deg < 15)  return { type: 'conjunction', elongation: Math.round(deg) }
     return null
   } catch {
     return null
@@ -187,8 +272,25 @@ export function getNextEvents(bodyName, date) {
     }
 
     const body = Astronomy.Body[bodyName]
-    const outerPlanets = ['Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune']
+    const outerPlanets = ['Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto']
     const innerPlanets = ['Mercury', 'Venus']
+
+    // Ceres: scan forward day-by-day (astronomy-engine doesn't cover it)
+    if (bodyName === 'Ceres') {
+      let oppDate = null, conjDate = null
+      let prevDeg = ceresElongation(date)
+      for (let d = 3; d <= 600 && (!oppDate || !conjDate); d += 3) {
+        const t = new Date(date.getTime() + d * 86_400_000)
+        const deg = ceresElongation(t)
+        if (!oppDate  && deg > 160) oppDate  = t
+        if (!conjDate && deg < 15)  conjDate = t
+        prevDeg = deg
+      }
+      const events = []
+      if (oppDate)  events.push({ type: 'Opposition',  label: fmtDate(oppDate),  days: daysUntil(oppDate),  emoji: '◉', color: '#ffaa00' })
+      if (conjDate) events.push({ type: 'Conjunction', label: fmtDate(conjDate), days: daysUntil(conjDate), emoji: '☌', color: '#64a0ff' })
+      return events.sort((a, b) => a.days - b.days)
+    }
 
     if (outerPlanets.includes(bodyName)) {
       const opp = Astronomy.SearchRelativeLongitude(body, 180, date)
@@ -268,8 +370,24 @@ export function getMoonPhaseInfo(date) {
  */
 export function getPlanetAltAz(bodyName, date, lat = 17.39, lon = 78.49) {
   try {
-    const body = Astronomy.Body[bodyName]
     const observer = new Astronomy.Observer(lat, lon, 0)
+
+    if (bodyName === 'Ceres') {
+      // Heliocentric ecliptic → geocentric ecliptic → equatorial → horizontal
+      const ev = Astronomy.HelioVector(Astronomy.Body.Earth, date)
+      const cv = ceresEcliptic(date)
+      const gx = cv.x - ev.x, gy = cv.y - ev.y, gz = cv.z - ev.z
+      // Rotate geocentric ecliptic to equatorial (obliquity rotation around x-axis)
+      const cosE = Math.cos(OBLIQUITY), sinE = Math.sin(OBLIQUITY)
+      const eqX = gx, eqY = gy * cosE - gz * sinE, eqZ = gy * sinE + gz * cosE
+      const dist = Math.sqrt(gx*gx + gy*gy + gz*gz)
+      const ra  = ((Math.atan2(eqY, eqX) * 12 / Math.PI) + 24) % 24  // hours
+      const dec = Math.asin(Math.max(-1, Math.min(1, eqZ / dist))) / DEG  // degrees
+      const horizontal = Astronomy.Horizon(date, observer, ra, dec, 'normal')
+      return { altitude: horizontal.altitude, azimuth: horizontal.azimuth }
+    }
+
+    const body = Astronomy.Body[bodyName]
     const equatorial = Astronomy.Equator(body, date, observer, true, true)
     const horizontal = Astronomy.Horizon(date, observer, equatorial.ra, equatorial.dec, 'normal')
     return { altitude: horizontal.altitude, azimuth: horizontal.azimuth }
@@ -315,6 +433,25 @@ export function getSunTimes(date, lat = 17.39, lon = 78.49) {
  */
 export function getRiseSet(bodyName, date, lat = 17.39, lon = 78.49) {
   if (bodyName === 'Earth') return null
+
+  // Ceres: scan every 10 minutes through the day to find altitude crossings
+  if (bodyName === 'Ceres') {
+    try {
+      const startOfDay = new Date(date); startOfDay.setHours(0, 0, 0, 0)
+      const fmt = (d) => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      let riseTime = null, setTime = null, prevAlt = null
+      for (let min = 0; min <= 1440; min += 10) {
+        const t = new Date(startOfDay.getTime() + min * 60_000)
+        const { altitude } = getPlanetAltAz('Ceres', t, lat, lon)
+        if (prevAlt !== null) {
+          if (prevAlt < 0 && altitude >= 0 && !riseTime) riseTime = t
+          if (prevAlt >= 0 && altitude < 0 && !setTime)  setTime  = t
+        }
+        prevAlt = altitude
+      }
+      return { rise: riseTime ? fmt(riseTime) : 'N/A', set: setTime ? fmt(setTime) : 'N/A' }
+    } catch { return { rise: 'N/A', set: 'N/A' } }
+  }
 
   try {
     const body = Astronomy.Body[bodyName]

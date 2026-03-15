@@ -104,6 +104,34 @@ export const PLANETS = [
       'Was predicted mathematically before it was observed',
     ],
   },
+  {
+    name: 'Ceres',
+    body: 'Ceres',
+    color: '#c4b8a8',
+    radius: 0.074,
+    emoji: '⚳',
+    dwarf: true,
+    facts: [
+      'Largest object in the asteroid belt — holds ~1/3 of its total mass',
+      'Classified as a planet from 1801–1850, then dwarf planet since 2006',
+      'Likely has a subsurface ocean and a thin water vapour atmosphere',
+      "NASA's Dawn spacecraft orbited Ceres from 2015 to 2018",
+    ],
+  },
+  {
+    name: 'Pluto',
+    body: 'Pluto',
+    color: '#c4a882',
+    radius: 0.186,
+    emoji: '♇',
+    dwarf: true,
+    facts: [
+      'Reclassified from planet to dwarf planet in 2006',
+      'Has 5 moons; Charon is so large they mutually orbit each other',
+      'A year on Pluto lasts 248 Earth years',
+      'New Horizons flyby in 2015 revealed a heart-shaped nitrogen ice plain',
+    ],
+  },
 ]
 
 export const SUN_DATA = {
