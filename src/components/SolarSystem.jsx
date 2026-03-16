@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { Canvas, useThree, useFrame } from '@react-three/fiber'
-import { OrbitControls, Stars } from '@react-three/drei'
+import { OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
 import Sun from './Sun'
 import Planet from './Planet'
@@ -100,8 +100,7 @@ export default function SolarSystem({ date, selectedPlanet, focusPlanet, beltFoc
       style={{ background: 'transparent' }}
       onPointerMissed={() => onPlanetClick(null)}
     >
-      <Stars radius={700} depth={100} count={3000} factor={4} saturation={0} fade speed={0.5} />
-      <CameraAnimator scenePos={selectedScenePos} />
+<CameraAnimator scenePos={selectedScenePos} />
       <BeltCameraAnimator cameraY={beltFocus} />
 
       <Sun onClick={() => onPlanetClick(SUN_DATA)} />
