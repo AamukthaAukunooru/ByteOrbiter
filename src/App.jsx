@@ -17,6 +17,7 @@ export default function App() {
   const [viewMode, setViewMode] = useState('solar') // 'solar' | 'night'
   const [speed, setSpeed] = useState(0) // days per second; 0 = paused
   const [beltFocus, setBeltFocus] = useState(null) // cameraY to fly to for belt top-down view
+  const [showConstellations, setShowConstellations] = useState(true)
   const { iss, error: issError } = useISS(4000)
 
   // Animation loop — advances date at `speed` days/second, 20 ticks/s
@@ -72,6 +73,20 @@ export default function App() {
           <SearchBar onSelect={handleSearch} />
           <ISSWidget iss={iss} error={issError} onSelect={handleSearch} />
 
+          {/* Constellation toggle — only in night sky mode */}
+          {viewMode === 'night' && (
+            <button
+              onClick={() => setShowConstellations(s => !s)}
+              className="text-[11px] px-3 py-1 rounded-full border transition-colors"
+              style={showConstellations
+                ? { background: 'rgba(100,170,255,0.15)', border: '1px solid rgba(100,170,255,0.4)', color: '#88aaff' }
+                : { background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.6)' }
+              }
+            >
+              ✦ Constellations
+            </button>
+          )}
+
           {/* View toggle */}
           <button
             onClick={() => setViewMode(m => m === 'solar' ? 'night' : 'solar')}
@@ -121,6 +136,7 @@ export default function App() {
               selectedPlanet={selectedPlanet}
               onPlanetClick={setSelectedPlanet}
               issData={iss}
+              showConstellations={showConstellations}
             />
           )}
         </Suspense>

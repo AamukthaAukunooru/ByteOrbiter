@@ -462,6 +462,20 @@ export function getMoonPhaseInfo(date) {
 }
 
 /**
+ * Get altitude and azimuth of a star given its RA/Dec.
+ * ra: right ascension in hours, dec: declination in degrees
+ */
+export function getStarAltAz(ra, dec, date, lat = 17.39, lon = 78.49) {
+  try {
+    const observer = new Astronomy.Observer(lat, lon, 0)
+    const horizontal = Astronomy.Horizon(date, observer, ra, dec, 'normal')
+    return { altitude: horizontal.altitude, azimuth: horizontal.azimuth }
+  } catch {
+    return { altitude: -90, azimuth: 0 }
+  }
+}
+
+/**
  * Get altitude and azimuth of a body from the observer's location.
  * Altitude: degrees above horizon (negative = below horizon)
  * Azimuth: compass bearing (0=N, 90=E, 180=S, 270=W)

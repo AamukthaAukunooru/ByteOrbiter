@@ -3,7 +3,8 @@ import { Canvas, useThree, useFrame } from '@react-three/fiber'
 import { Stars, OrbitControls, Html, Line } from '@react-three/drei'
 import * as THREE from 'three'
 import { PLANETS, MOON_DATA, SUN_DATA, ISS_DATA } from '../data/planets'
-import { getPlanetAltAz, getMoonPhaseInfo, getISSAltAz } from '../utils/astronomy'
+import { getPlanetAltAz, getMoonPhaseInfo, getISSAltAz, getStarAltAz } from '../utils/astronomy'
+import { CONSTELLATIONS } from '../data/constellations'
 
 const DOME_RADIUS = 80
 
@@ -259,6 +260,86 @@ function SkyISS({ issData, isSelected, onClick }) {
   )
 }
 
+function ConstellationLines({ date }) {
+  const computed = useMemo(() => {
+    return CONSTELLATIONS.map((con) => {
+      // Convert each star RA/Dec → alt/az → 3D point
+      const starAltAz = con.stars.map(([ra, dec]) => getStarAltAz(ra, dec, date))
+      const pts3d = starAltAz.map(({ altitude, azimuth }) => altAzTo3D(altitude, azimuth))
+
+      // Build line segments (each segment is a pair of points)
+      const segments = con.lines.map(([i, j]) => [pts3d[i], pts3d[j]])
+
+      // Star dot positions + magnitudes
+      const starDots = con.stars.map(([, , mag], idx) => ({
+        pos: pts3d[idx],
+        mag,
+        altitude: starAltAz[idx].altitude,
+      }))
+
+      // Label position
+      const { altitude: labelAlt, azimuth: labelAz } = getStarAltAz(con.label[0], con.label[1], date)
+      const labelPos = altAzTo3D(labelAlt, labelAz)
+      const labelAbove = labelAlt > 0
+
+      return { name: con.name, segments, starDots, labelPos, labelAbove }
+    })
+  }, [date])
+
+  return (
+    <>
+      {computed.map(({ name, segments, starDots, labelPos, labelAbove }) => (
+        <group key={name}>
+          {/* Constellation lines */}
+          {segments.map(([a, b], i) => (
+            <Line
+              key={i}
+              points={[a, b]}
+              color="#4488cc"
+              lineWidth={0.8}
+              transparent
+              opacity={0.35}
+            />
+          ))}
+
+          {/* Star dots sized by magnitude */}
+          {starDots.map(({ pos, mag, altitude }, i) => {
+            const r = Math.max(0.12, 0.55 - mag * 0.1)
+            return (
+              <mesh key={i} position={pos}>
+                <sphereGeometry args={[r, 6, 6]} />
+                <meshBasicMaterial
+                  color="#cce8ff"
+                  transparent
+                  opacity={altitude > 0 ? 0.9 : 0.2}
+                />
+              </mesh>
+            )
+          })}
+
+          {/* Constellation name label */}
+          {labelAbove && (
+            <Html position={labelPos} center>
+              <div style={{
+                color: 'rgba(100,170,255,0.6)',
+                fontSize: '10px',
+                letterSpacing: '0.12em',
+                textTransform: 'uppercase',
+                whiteSpace: 'nowrap',
+                pointerEvents: 'none',
+                userSelect: 'none',
+                textShadow: '0 0 6px rgba(0,0,0,1)',
+              }}>
+                {name}
+              </div>
+            </Html>
+          )}
+        </group>
+      ))}
+    </>
+  )
+}
+
 function HorizonAndDirections() {
   const horizonPoints = useMemo(() => {
     const pts = []
@@ -349,7 +430,7 @@ function NightSkyCameraAnimator({ planet, date, issData }) {
   return null
 }
 
-export default function NightSkyView({ date, selectedPlanet, onPlanetClick, issData }) {
+export default function NightSkyView({ date, selectedPlanet, onPlanetClick, issData, showConstellations }) {
   return (
     <Canvas
       camera={{ position: [0, 0, 0.01], fov: 80, near: 0.001, far: 500 }}
@@ -360,6 +441,7 @@ export default function NightSkyView({ date, selectedPlanet, onPlanetClick, issD
       <ambientLight intensity={0.05} />
 
       <NightSkyCameraAnimator planet={selectedPlanet} date={date} issData={issData} />
+      {showConstellations && <ConstellationLines date={date} />}
       <HorizonAndDirections />
       <SunDot date={date} onClick={onPlanetClick} />
       <SkyMoon
@@ -385,9 +467,12 @@ export default function NightSkyView({ date, selectedPlanet, onPlanetClick, issD
       />
 
       <OrbitControls
-        enableZoom={false}
+        enableZoom={true}
         enablePan={false}
-        rotateSpeed={0.5}
+        rotateSpeed={-0.5}
+        zoomSpeed={0.8}
+        minDistance={0.001}
+        maxDistance={3}
         makeDefault
       />
     </Canvas>
