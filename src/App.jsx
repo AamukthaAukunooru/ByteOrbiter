@@ -178,7 +178,7 @@ export default function App() {
       <InfoPanel
         planet={selectedPlanet}
         date={date}
-        onClose={() => setSelectedPlanet(null)}
+        onClose={() => { setSelectedPlanet(null); setFocusPlanet(null) }}
         issData={iss}
       />
 
