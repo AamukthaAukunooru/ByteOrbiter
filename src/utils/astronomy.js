@@ -420,17 +420,40 @@ export function getNextEvents(bodyName, date) {
 }
 
 /**
- * Returns the normalized geocentric direction of the Moon relative to Earth,
- * in scene coordinates (x = ecliptic x, z = ecliptic y).
- * Used to place the Moon at the correct angular position around Earth in the solar system view.
+ * Returns the normalised 3-D geocentric direction of the Moon in scene coordinates.
+ *   scene x = ecliptic x
+ *   scene y = ecliptic z  (out-of-plane — carries the ~5.14° orbital inclination)
+ *   scene z = ecliptic y
  */
 export function getMoonGeocentricDirection(date) {
   const earthVec = Astronomy.HelioVector(Astronomy.Body.Earth, date)
-  const moonVec = Astronomy.HelioVector(Astronomy.Body.Moon, date)
+  const moonVec  = Astronomy.HelioVector(Astronomy.Body.Moon,  date)
   const dx = moonVec.x - earthVec.x   // ecliptic x → scene x
+  const dy = moonVec.z - earthVec.z   // ecliptic z → scene y  (inclination)
   const dz = moonVec.y - earthVec.y   // ecliptic y → scene z
-  const len = Math.sqrt(dx * dx + dz * dz) || 1
-  return { x: dx / len, z: dz / len }
+  const len = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1
+  return { x: dx / len, y: dy / len, z: dz / len }
+}
+
+/**
+ * Samples the Moon's actual geocentric orbit over one sidereal month starting
+ * from `date`.  Returns an array of normalised 3-D direction vectors (scene coords)
+ * that trace the true tilted orbit — used for the orbit-ring line in the 3D view.
+ */
+export function getMoonOrbitPoints(date, samples = 48) {
+  const SIDEREAL_MS = 27.321661 * 86_400_000
+  const pts = []
+  for (let i = 0; i <= samples; i++) {
+    const t  = new Date(date.getTime() + (i / samples) * SIDEREAL_MS)
+    const ev = Astronomy.HelioVector(Astronomy.Body.Earth, t)  // Earth at time t
+    const mv = Astronomy.HelioVector(Astronomy.Body.Moon,  t)
+    const dx = mv.x - ev.x
+    const dy = mv.z - ev.z   // ecliptic z → scene y (inclination)
+    const dz = mv.y - ev.y   // ecliptic y → scene z
+    const len = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1
+    pts.push({ x: dx / len, y: dy / len, z: dz / len })
+  }
+  return pts
 }
 
 /**

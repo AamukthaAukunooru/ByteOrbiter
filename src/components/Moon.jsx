@@ -2,7 +2,7 @@ import { useRef, useMemo, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Html, Line } from '@react-three/drei'
 import { AU_SCALE, MOON_DATA } from '../data/planets'
-import { getMoonGeocentricDirection, getMoonPhaseInfo } from '../utils/astronomy'
+import { getMoonGeocentricDirection, getMoonOrbitPoints, getMoonPhaseInfo } from '../utils/astronomy'
 
 // Visual orbit radius in scene units (exaggerated for visibility — real is ~0.015 units)
 const MOON_VISUAL_ORBIT = 0.9
@@ -11,29 +11,32 @@ export default function MoonOrbit({ earthPosition, date, isSelected, onClick }) 
   const meshRef = useRef()
   const [hovered, setHovered] = useState(false)
 
-  const moonDir = useMemo(() => getMoonGeocentricDirection(date), [date])
+  const moonDir   = useMemo(() => getMoonGeocentricDirection(date), [date])
   const phaseInfo = useMemo(() => getMoonPhaseInfo(date), [date])
 
-  // Orbit ring around Earth
+  // Tilted orbit ring — recompute the shape monthly (nodal precession is slow)
+  // Uses actual sampled Moon positions so the ~5.14° inclination is accurate
+  const orbitDirs = useMemo(
+    () => getMoonOrbitPoints(date),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [date.getFullYear(), date.getMonth()]
+  )
+
+  // Translate the Earth-relative orbit shape into scene space each frame
   const orbitPoints = useMemo(() => {
     const [ex, , ez] = earthPosition
-    const pts = []
-    for (let i = 0; i <= 64; i++) {
-      const angle = (i / 64) * Math.PI * 2
-      pts.push([
-        ex + Math.cos(angle) * MOON_VISUAL_ORBIT,
-        0,
-        ez + Math.sin(angle) * MOON_VISUAL_ORBIT,
-      ])
-    }
-    return pts
-  }, [earthPosition])
+    return orbitDirs.map(d => [
+      ex + d.x * MOON_VISUAL_ORBIT,
+      d.y * MOON_VISUAL_ORBIT,
+      ez + d.z * MOON_VISUAL_ORBIT,
+    ])
+  }, [earthPosition, orbitDirs])
 
   const moonPos = useMemo(() => {
     const [ex, , ez] = earthPosition
     return [
       ex + moonDir.x * MOON_VISUAL_ORBIT,
-      0,
+      moonDir.y * MOON_VISUAL_ORBIT,   // y elevation from orbital inclination
       ez + moonDir.z * MOON_VISUAL_ORBIT,
     ]
   }, [earthPosition, moonDir])
@@ -46,13 +49,13 @@ export default function MoonOrbit({ earthPosition, date, isSelected, onClick }) 
 
   return (
     <group>
-      {/* Orbit ring */}
+      {/* Orbit ring — styled like planet orbits */}
       <Line
-        points={orbitPoints}
-        color="#666"
-        lineWidth={highlighted ? 0.6 : 0.3}
+        points={[...orbitPoints, orbitPoints[0]]}
+        color="#c8c8c8"
+        lineWidth={highlighted ? 1 : 0.4}
         transparent
-        opacity={highlighted ? 0.35 : 0.18}
+        opacity={highlighted ? 0.4 : 0.15}
       />
 
       {/* Moon sphere */}
