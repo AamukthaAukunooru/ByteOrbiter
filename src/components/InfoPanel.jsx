@@ -1,10 +1,15 @@
 import { useEffect, useState } from 'react'
-import { getDistanceFromEarth, getPlanetVisibility, getRiseSet, getVisibilityExplanation, getMoonPhaseInfo, getNextEvents, getSunTimes, getNextHalleyPerihelion, getISSAltAz } from '../utils/astronomy'
+import { getDistanceFromEarth, getPlanetVisibility, getRiseSet, getVisibilityExplanation, getMoonPhaseInfo, getNextEvents, getSunTimes, getNextHalleyPerihelion, getISSAltAz, getPlanetPhase } from '../utils/astronomy'
+import TelescopeView from './TelescopeView'
 
 const AU_TO_KM = 149_597_870.7
 
 export default function InfoPanel({ planet, date, onClose, issData }) {
   const [info, setInfo] = useState(null)
+  const [showTelescope, setShowTelescope] = useState(false)
+
+  // Close telescope when planet changes
+  useEffect(() => { setShowTelescope(false) }, [planet])
 
   useEffect(() => {
     if (!planet) { setInfo(null); return }
@@ -31,8 +36,17 @@ export default function InfoPanel({ planet, date, onClose, issData }) {
   const distKm = info?.distAU != null ? (info.distAU * AU_TO_KM).toLocaleString(undefined, { maximumFractionDigits: 0 }) : '—'
   const distAU = info?.distAU != null ? info.distAU.toFixed(planet?.name === 'Moon' ? 6 : 3) : '—'
 
+  // Show telescope button for planets/moon that have a computable phase
+  const hasPhase = !planet.iss && !planet.comet && !['Earth', 'Sun'].includes(planet.name)
+    && getPlanetPhase(planet.body, date) !== null
+
   return (
     <>
+      {/* Telescope view overlay */}
+      {showTelescope && hasPhase && (
+        <TelescopeView planet={planet} date={date} onClose={() => setShowTelescope(false)} />
+      )}
+
       {/* Backdrop for mobile */}
       <div
         className="fixed inset-0 bg-black/40 md:hidden z-10"
@@ -81,12 +95,27 @@ export default function InfoPanel({ planet, date, onClose, issData }) {
               </span>
             )}
           </div>
-          <button
-            onClick={onClose}
-            className="text-white/50 hover:text-white text-xl leading-none"
-          >
-            ×
-          </button>
+          <div className="flex items-center gap-2">
+            {hasPhase && (
+              <button
+                onClick={() => setShowTelescope(s => !s)}
+                className="text-[11px] px-2.5 py-1 rounded-full border transition-colors"
+                style={showTelescope
+                  ? { background: `${planet.color}22`, border: `1px solid ${planet.color}66`, color: planet.color }
+                  : { background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.18)', color: 'rgba(255,255,255,0.55)' }
+                }
+                title="Telescope view"
+              >
+                🔭
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="text-white/50 hover:text-white text-xl leading-none"
+            >
+              ×
+            </button>
+          </div>
         </div>
 
         {/* ISS live data */}

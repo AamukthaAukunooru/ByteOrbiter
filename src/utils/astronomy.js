@@ -587,6 +587,29 @@ export function getRiseSet(bodyName, date, lat = 17.39, lon = 78.49) {
 }
 
 /**
+ * Returns phase info for a planet as seen from Earth.
+ * { phaseAngle: degrees (0=full, 180=new), phaseFraction: 0–1, magnitude, ringTilt (Saturn only) }
+ * Returns null for bodies that don't show phases (Earth, Sun, ISS, Halley, Ceres).
+ */
+export function getPlanetPhase(bodyName, date) {
+  const unsupported = ['Earth', 'Sun', 'ISS', 'Halley', 'Ceres']
+  if (!bodyName || unsupported.includes(bodyName)) return null
+  try {
+    const body = Astronomy.Body[bodyName]
+    if (!body) return null
+    const illum = Astronomy.Illumination(body, date)
+    return {
+      phaseAngle:    illum.phase_angle,
+      phaseFraction: illum.phase_fraction,
+      magnitude:     illum.mag,
+      ringTilt:      bodyName === 'Saturn' ? illum.ring_tilt : null,
+    }
+  } catch {
+    return null
+  }
+}
+
+/**
  * Returns the next `count` upcoming solar and lunar eclipses sorted by date.
  * Each eclipse object: { isSolar, kind, type, date, daysUntil, label, timeUTC,
  *   obscuration?, latitude?, longitude?, sdTotal?, sdPartial?, sdPenum? }
