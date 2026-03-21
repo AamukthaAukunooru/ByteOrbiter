@@ -6,6 +6,7 @@ import SpeedControl from './components/SpeedControl'
 import InfoPanel from './components/InfoPanel'
 import SearchBar from './components/SearchBar'
 import ISSWidget from './components/ISSWidget'
+import EclipsePredictor from './components/EclipsePredictor'
 import { getElongationEvent } from './utils/astronomy'
 import { PLANETS } from './data/planets'
 import { useISS } from './hooks/useISS'
@@ -18,6 +19,7 @@ export default function App() {
   const [speed, setSpeed] = useState(0) // days per second; 0 = paused
   const [beltFocus, setBeltFocus] = useState(null) // cameraY to fly to for belt top-down view
   const [showConstellations, setShowConstellations] = useState(true)
+  const [showEclipses, setShowEclipses] = useState(false)
   const { iss, error: issError } = useISS(4000)
 
   // Animation loop — advances date at `speed` days/second, 20 ticks/s
@@ -72,6 +74,18 @@ export default function App() {
           )}
           <SearchBar onSelect={handleSearch} />
           <ISSWidget iss={iss} error={issError} onSelect={handleSearch} />
+
+          {/* Eclipse predictor toggle */}
+          <button
+            onClick={() => setShowEclipses(s => !s)}
+            className="text-[11px] px-3 py-1 rounded-full border transition-colors"
+            style={showEclipses
+              ? { background: 'rgba(255,120,0,0.15)', border: '1px solid rgba(255,120,0,0.45)', color: '#ff9040' }
+              : { background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.6)' }
+            }
+          >
+            🌑 Eclipses
+          </button>
 
           {/* Constellation toggle — only in night sky mode */}
           {viewMode === 'night' && (
@@ -167,6 +181,15 @@ export default function App() {
         onClose={() => setSelectedPlanet(null)}
         issData={iss}
       />
+
+      {/* Eclipse Predictor */}
+      {showEclipses && (
+        <EclipsePredictor
+          date={date}
+          onClose={() => setShowEclipses(false)}
+          onJumpToDate={setDate}
+        />
+      )}
     </div>
   )
 }

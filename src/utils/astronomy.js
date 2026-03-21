@@ -585,3 +585,74 @@ export function getRiseSet(bodyName, date, lat = 17.39, lon = 78.49) {
     return { rise: 'N/A', set: 'N/A' }
   }
 }
+
+/**
+ * Returns the next `count` upcoming solar and lunar eclipses sorted by date.
+ * Each eclipse object: { isSolar, kind, type, date, daysUntil, label, timeUTC,
+ *   obscuration?, latitude?, longitude?, sdTotal?, sdPartial?, sdPenum? }
+ */
+export function getUpcomingEclipses(date, count = 12) {
+  const MS_PER_DAY = 86_400_000
+  const solarResults = []
+  const lunarResults = []
+
+  try {
+    let s = Astronomy.SearchGlobalSolarEclipse(date)
+    for (let i = 0; i < count && s; i++) {
+      solarResults.push(s)
+      s = Astronomy.NextGlobalSolarEclipse(s)
+    }
+  } catch { /* ignore */ }
+
+  try {
+    let l = Astronomy.SearchLunarEclipse(date)
+    for (let i = 0; i < count && l; i++) {
+      lunarResults.push(l)
+      l = Astronomy.NextLunarEclipse(l)
+    }
+  } catch { /* ignore */ }
+
+  const SOLAR_LABELS = {
+    total:   'Total Solar Eclipse',
+    annular: 'Annular Solar Eclipse',
+    partial: 'Partial Solar Eclipse',
+    hybrid:  'Hybrid Solar Eclipse',
+  }
+  const LUNAR_LABELS = {
+    total:      'Total Lunar Eclipse',
+    partial:    'Partial Lunar Eclipse',
+    penumbral:  'Penumbral Lunar Eclipse',
+  }
+
+  const all = [
+    ...solarResults.map(e => ({
+      isSolar:     true,
+      kind:        e.kind,
+      type:        SOLAR_LABELS[e.kind] ?? 'Solar Eclipse',
+      date:        e.peak.date,
+      obscuration: e.obscuration,
+      latitude:    e.latitude,
+      longitude:   e.longitude,
+    })),
+    ...lunarResults.map(e => ({
+      isSolar:    false,
+      kind:       e.kind,
+      type:       LUNAR_LABELS[e.kind] ?? 'Lunar Eclipse',
+      date:       e.peak.date,
+      obscuration: e.obscuration,
+      sdTotal:    e.sd_total,
+      sdPartial:  e.sd_partial,
+      sdPenum:    e.sd_penum,
+    })),
+  ]
+    .sort((a, b) => a.date - b.date)
+    .slice(0, count)
+    .map(e => ({
+      ...e,
+      daysUntil: Math.round((e.date - date) / MS_PER_DAY),
+      label:     e.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      timeUTC:   e.date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' }) + ' UTC',
+    }))
+
+  return all
+}
