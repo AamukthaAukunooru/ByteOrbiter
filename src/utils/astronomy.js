@@ -587,6 +587,55 @@ export function getRiseSet(bodyName, date, lat = 17.39, lon = 78.49) {
 }
 
 /**
+ * Checks whether `date` falls inside an ongoing lunar eclipse.
+ * Searches from up to 6 hours before `date` to catch eclipses already in progress.
+ *
+ * Returns null if no eclipse is active, or:
+ *   { kind, phase: 'total'|'partial'|'penumbral', progress: 0–1 (1 = deepest) }
+ */
+export function getCurrentLunarEclipse(date) {
+  try {
+    const searchStart = new Date(date.getTime() - 2 * 86_400_000)
+    const eclipse = Astronomy.SearchLunarEclipse(searchStart)
+    if (!eclipse) return null
+
+    const peak        = eclipse.peak.date
+    const peakMs      = peak.getTime()
+    const diff        = Math.abs(date.getTime() - peakMs)
+
+    // Match by calendar day (UTC) so navigating to "Sep 7" always shows the
+    // effect regardless of what time the date picker defaults to
+    const sameDay =
+      peak.getUTCFullYear() === date.getUTCFullYear() &&
+      peak.getUTCMonth()    === date.getUTCMonth()    &&
+      peak.getUTCDate()     === date.getUTCDate()
+
+    const sdPenumMs   = (eclipse.sd_penum   || 0) * 60_000
+    const sdPartialMs = (eclipse.sd_partial || 0) * 60_000
+    const sdTotalMs   = (eclipse.sd_total   || 0) * 60_000
+
+    // Not in the actual penumbral window AND not on the same calendar day → skip
+    if (!sameDay && diff > sdPenumMs) return null
+
+    // If we're inside the real penumbral window use accurate timing;
+    // if we're just on the same day (e.g. midnight), show eclipse at full effect
+    if (diff <= sdPenumMs) {
+      let phase = 'penumbral'
+      if (sdTotalMs   > 0 && diff <= sdTotalMs)   phase = 'total'
+      else if (sdPartialMs > 0 && diff <= sdPartialMs) phase = 'partial'
+      const progress = Math.max(0, 1 - diff / sdPenumMs)
+      return { kind: eclipse.kind, phase, progress }
+    }
+
+    // Same calendar day but outside the actual window — show at full intensity
+    // so navigating to "the eclipse date" always gives the blood moon experience
+    return { kind: eclipse.kind, phase: eclipse.kind, progress: 1.0 }
+  } catch {
+    return null
+  }
+}
+
+/**
  * Returns phase info for a planet as seen from Earth.
  * { phaseAngle: degrees (0=full, 180=new), phaseFraction: 0–1, magnitude, ringTilt (Saturn only) }
  * Returns null for bodies that don't show phases (Earth, Sun, ISS, Halley, Ceres).
