@@ -1,16 +1,32 @@
-# React + Vite
+# ByteOrbiter
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+ByteOrbiter is an interactive web-based astronomical visualization application built with React, Vite, Three.js, and React Three Fiber.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **Interactive 3D Views:** Explore celestial bodies and systems in an interactive 3D environment.
+- **Dynamic Perspectives:** Switch between Heliocentric (Sun-centered) and Geocentric (Earth-centered) viewpoints.
+- **Telescope View:** A dedicated component (`TelescopeView`) for observing celestial objects.
+- **Eclipse Predictor:** Calculate and predict upcoming solar and lunar eclipses.
+- **Asteroid Belt & Constellations:** Detailed 3D visual representations of the asteroid belt and major star constellations.
 
-## React Compiler
+## Tech Stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **React** (UI Framework)
+- **Vite** (Build Tool)
+- **Three.js & React Three Fiber** (3D WebGL Rendering)
 
-## Expanding the ESLint configuration
+## Running Locally
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+2. Start the development server:
+   ```bash
+   npm run dev
+   ```
+
+## Deployment
+
+The project is configured to automatically deploy to GitHub Pages directly from the `main` branch.
